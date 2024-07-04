@@ -1,0 +1,80 @@
+---
+title: "ST558 - Project 2 - Shinies!"
+author: "Laraib Azmat"
+format: html
+editor: visual
+---
+
+```{r Library read in}
+library(httr)
+library(jsonlite)
+library(tidyverse)
+```
+
+```{r}
+currency_info <- function(date = "latest", apiVersion = "v1", currency){
+  URL <- paste("https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@",
+               date,
+               "/",
+               apiVersion,
+               "/currencies/",
+               currency,
+               ".json",
+               sep = "")
+  
+  temp_parse <- GET(URL)$content |>
+    rawToChar() |>
+    fromJSON() |>
+    as.data.frame() |>
+    as_tibble()
+  
+  currency_api_URL <- paste("https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@",
+               date,
+               "/",
+               apiVersion,
+               "/currencies.json",
+               "",
+               sep = "")
+  
+  name_parse <- GET(currency_api_URL)$content |>
+    rawToChar() |>
+    fromJSON() |>
+    as.data.frame() |>
+    as_tibble()
+  
+  print(name_parse)
+  print(temp_parse)
+}
+```
+
+```{r}
+currency_info(, , "amp")
+```
+
+```{r}
+  currency_api_URL <- paste("https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies.json")
+  
+  name_parse <- GET(currency_api_URL)$content |>
+    rawToChar() |>
+    fromJSON() |>
+    as.data.frame() |>
+    as_tibble()
+  
+  name_parse
+```
+
+```{r}
+amp_api <- httr::GET("https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/amp.json")
+
+amp_parsed <- amp_api$content |>
+  rawToChar() |>
+  fromJSON() |>
+  as_tibble() 
+
+amp_parsed
+```
+
+```{r}
+amp_parsed %>% pivot_longer(cols = c("date", "amp"))
+```
+

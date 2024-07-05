@@ -12,7 +12,9 @@ library(tidyverse)
 ```
 
 ```{r}
-currency_info <- function(date = "latest", apiVersion = "v1", currency){
+# Inputs Date[string], Curency[string]
+# return: I want list[doubles] (conversion rate by courency) 
+currency_conversion <- function(date = "latest", apiVersion = "v1", currency){
   URL <- paste("https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@",
                date,
                "/",
@@ -25,8 +27,60 @@ currency_info <- function(date = "latest", apiVersion = "v1", currency){
   temp_parse <- GET(URL)$content |>
     rawToChar() |>
     fromJSON() |>
+    as_tibble() |>
+    unnest(cols = currency)
+
+  return(temp_parse)
+}
+```
+
+```{r}
+currency_conversion(, , "zmk")
+```
+
+```{r}
+currency_names <- function(date = "latest", apiVersion = "v1"){
+  currency_api_URL <- paste("https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@",
+               date,
+               "/",
+               apiVersion,
+               "/currencies.json",
+               "",
+               sep = "")
+  
+  name_parsed <- GET(currency_api_URL)$content |>
+    rawToChar() |>
+    fromJSON() |>
     as.data.frame() |>
-    as_tibble()
+    as_tibble()|> 
+    mutate(obs.number = row_number()) |>
+    pivot_longer(-obs.number,
+               values_to = "Currency")
+  return(name_parsed)
+}
+```
+
+```{r}
+currency_names(, )
+```
+
+
+```{r}
+full_conversion <- function(date = "latest", apiVersion = "v1", currency){
+  URL <- paste("https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@",
+               date,
+               "/",
+               apiVersion,
+               "/currencies/",
+               currency,
+               ".json",
+               sep = "")
+  
+  temp_parse <- GET(URL)$content |>
+    rawToChar() |>
+    fromJSON() |>
+    as_tibble() |>
+    unnest(cols = currency)
   
   currency_api_URL <- paste("https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@",
                date,
@@ -40,28 +94,21 @@ currency_info <- function(date = "latest", apiVersion = "v1", currency){
     rawToChar() |>
     fromJSON() |>
     as.data.frame() |>
-    as_tibble()
+    as_tibble()|> 
+    mutate(obs.number = row_number()) |>
+    pivot_longer(-obs.number,
+               values_to = "Currency")
   
-  print(name_parse)
-  print(temp_parse)
+
+  return(currency_info)
+  
 }
 ```
 
 ```{r}
-currency_info(, , "amp")
+full_conversion(, , "amp")
 ```
 
-```{r}
-  currency_api_URL <- paste("https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies.json")
-  
-  name_parse <- GET(currency_api_URL)$content |>
-    rawToChar() |>
-    fromJSON() |>
-    as.data.frame() |>
-    as_tibble()
-  
-  name_parse
-```
 
 ```{r}
 amp_api <- httr::GET("https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/amp.json")
@@ -69,12 +116,25 @@ amp_api <- httr::GET("https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@lat
 amp_parsed <- amp_api$content |>
   rawToChar() |>
   fromJSON() |>
-  as_tibble() 
+  as_tibble() |>
+  unnest(cols = amp)
+
 
 amp_parsed
 ```
 
 ```{r}
-amp_parsed %>% pivot_longer(cols = c("date", "amp"))
+name_api <- httr::GET("https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies.json")
+
+name_parse <- name_api$content |>
+  rawToChar() |>
+  fromJSON() |>
+  as.data.frame() |>
+  as_tibble()|> 
+  mutate(obs.number = row_number()) |>
+  pivot_longer(-obs.number,
+             values_to = "Currency")
+
+name_parse
 ```
 

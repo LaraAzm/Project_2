@@ -13,12 +13,10 @@ library(janitor)
 ```
 
 ```{r}
-currency_conversion <- function(date = "latest", apiVersion = "v1", currency){
+currency_conversion <- function(date = "latest", currency){
   URL <- paste("https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@",
                date,
-               "/",
-               apiVersion,
-               "/currencies/",
+               "/v1/currencies/",
                currency,
                ".json",
                sep = "")
@@ -36,17 +34,14 @@ currency_conversion <- function(date = "latest", apiVersion = "v1", currency){
 ```
 
 ```{r}
-currency_conversion(, , "zmk")
+currency_conversion(, "zmk")
 ```
 
 ```{r}
-currency_names <- function(date = "latest", apiVersion = "v1"){
+currency_names <- function(date = "latest"){
   currency_api_URL <- paste("https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@",
                date,
-               "/",
-               apiVersion,
-               "/currencies.json",
-               "",
+               "/v1/currencies.json",
                sep = "")
   
   name_parse <- GET(currency_api_URL)$content |>
@@ -67,7 +62,7 @@ currency_names <- function(date = "latest", apiVersion = "v1"){
 ```
 
 ```{r}
-currency_names(, )
+currency_names( )
 ```
 
 ```{r}

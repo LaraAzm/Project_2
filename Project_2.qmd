@@ -126,14 +126,15 @@ currency_wrapper2("2024-06-05", "Aergo")
 ```{r}
 currency_wrapper3 <- function(date, full_currency_name){
   
-  country <- full_join(country_names, country_money) |>
-    select(name, currency, symbol)
+  country <- country_money |>
+    mutate(isocode = tolower(isocode))
   
-  names(country)[names(country) == 'currency'] <- 'currency_name'
-
   convert_money <- currency_wrapper2(date, full_currency_name)
   
-  country_convert <- cbind(country, convert_money)
+  convert_money$type <- NA
+  
+  convert_money <- convert_money |>
+    mutate(type = if_else(convert_money$name %in% country$isocode, "physical", "crypto"))
   
   return(convert_money)
   
@@ -156,7 +157,7 @@ currency_trend_day <- function(date, full_currency_name){
     }  
   
   else {
-    currency_trend <- currency_wrapper2(minus_7, full_currency_name)
+    currency_trend <- currency_wrapper3(minus_7, full_currency_name)
     
     currency_subset <- head(currency_trend, 5)
     
@@ -181,7 +182,7 @@ currency_trend_month <- function(date, full_currency_name){
   }  
   
   else {
-    currency_trend <- currency_wrapper2(minus_30, full_currency_name)
+    currency_trend <- currency_wrapper3(minus_30, full_currency_name)
         
     currency_subset <- head(currency_trend, 5)
     
@@ -198,8 +199,7 @@ create categories: is country currency or crypto
 create four plots: map with overlay; bar plot with euro, usd & common crypto values; highest value; 7 day trend, 1 month trend
 
 1 month trend and 7 day trend done
+currency type done
 
-```{r}
-country_names
-```
+
 

@@ -10,10 +10,13 @@ library(httr)
 library(jsonlite)
 library(tidyverse)
 library(janitor)
+library(dplyr)
+library(r2country)
 ```
 
 ```{r}
-currency_conversion <- function(date = "latest", currency){
+currency_value <- function(date, currency){
+  
   URL <- paste("https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@",
                date,
                "/v1/currencies/",
@@ -21,24 +24,25 @@ currency_conversion <- function(date = "latest", currency){
                ".json",
                sep = "")
   
-  temp_parse <- GET(URL)$content |>
+  value_parse <- GET(URL)$content |>
     rawToChar() |>
     fromJSON() |>
     as_tibble()
   
-  temp_parse <- bind_rows(temp_parse[[2]], .id = "currency") |>
+  value_parse <- bind_rows(value_parse[[2]], .id = "currency") |>
     pivot_longer(cols = everything())
 
-  return(temp_parse)
+  return(value_parse)
 }
 ```
 
 ```{r}
-currency_conversion(, "zmk")
+currency_value("2024-06-05", "zmk")
 ```
 
 ```{r}
-currency_names <- function(date = "latest"){
+just_names <- function(date){
+  
   currency_api_URL <- paste("https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@",
                date,
                "/v1/currencies.json",
@@ -53,6 +57,10 @@ currency_names <- function(date = "latest"){
     pivot_longer(-obs.number,
                values_to = "Currency")
   
+  name_parse[name_parse == ""] = NA
+  
+  names(name_parse)[names(name_parse) == 'Currency'] <- 'currency_name'
+  
   name_parse$name <- gsub("^X", "", name_parse$name)
 
   name_parse$name[1:2] <- gsub("^.", "$", name_parse$name[1:2])
@@ -62,11 +70,136 @@ currency_names <- function(date = "latest"){
 ```
 
 ```{r}
-currency_names( )
+just_names("2024-06-05")
 ```
 
 ```{r}
-"currency_wrapper" 
+currency_wrapper1 <- function(date, full_currency_name){
+  
+  directory <- just_names(date)
+  
+  if(!(full_currency_name %in% directory$currency_name)){
+    stop("Currency not found, please check currency name") 
+  }  
+  
+  else if(full_currency_name %in% directory$currency_name){
+    
+    match <- full_currency_name
+    currency_code <- as.character(directory[which(directory$currency_name == match), "name"])
+    
+    return(currency_code)
+  }
+}
 ```
 
+
+```{r}
+currency_wrapper1("2024-03-02", "US Dollar")
+```
+
+```{r}
+currency_wrapper2 <- function(date, full_currency_name){  
+  
+    cur_code <- currency_wrapper1 (date, full_currency_name)
+  
+    cur_names <- just_names(date)
+  
+    cur_value <- currency_value(date, cur_code)
+  
+    matchlist = c("usd","eur", "btc", "eth", cur_code)
+  
+    full_conversion <- full_join(cur_names, cur_value)
+  
+    full_conversion <- full_conversion |>
+      select(name, currency_name, value)|>
+      arrange(!name %in% matchlist) 
+  
+    return(full_conversion)
+ 
+}
+```
+
+```{r}
+currency_wrapper2("2024-06-05", "Aergo")
+```
+
+```{r}
+currency_wrapper3 <- function(date, full_currency_name){
+  
+  country <- full_join(country_names, country_money) |>
+    select(name, currency, symbol)
+  
+  names(country)[names(country) == 'currency'] <- 'currency_name'
+
+  convert_money <- currency_wrapper2(date, full_currency_name)
+  
+  country_convert <- cbind(country, convert_money)
+  
+  return(convert_money)
+  
+}
+```
+
+```{r}
+currency_wrapper3("2024-06-05", "Aergo")
+```
+
+```{r}
+currency_trend_day <- function(date, full_currency_name){
+  
+  date_value  <- as.Date(date)
+  
+  minus_7 <- date_value
+
+  if(!(minus_7 > as.Date("2024-03-02"))){
+  stop("Date out of range for api") 
+    }  
+  
+  else {
+    currency_trend <- currency_wrapper2(minus_7, full_currency_name)
+    
+    currency_subset <- head(currency_trend, 5)
+    
+    return(currency_subset)
+  }
+}
+```
+
+```{r}
+currency_trend_day("2024-06-05", "Tenset")
+```
+
+```{r}
+currency_trend_month <- function(date, full_currency_name){
+  
+  date_value  <- as.Date(date)
+  
+  minus_30 <- date_value - 30
+  
+  if(!(minus_30 > as.Date("2024-03-02"))){
+  stop("Date out of range for api") 
+  }  
+  
+  else {
+    currency_trend <- currency_wrapper2(minus_30, full_currency_name)
+        
+    currency_subset <- head(currency_trend, 5)
+    
+    return(currency_subset)
+  }
+}
+```
+
+```{r}
+currency_trend_month("2024-06-05", "Aergo")
+```
+
+create categories: is country currency or crypto
+create four plots: map with overlay; bar plot with euro, usd & common crypto values; highest value; 7 day trend, 1 month trend
+
+1 month trend and 7 day trend done
+
+```{r}
+country_names
+```
 

@@ -15,7 +15,7 @@ library(r2country)
 ```
 
 ```{r}
-currency_value <- function(date, currency){
+just_values <- function(date, currency){
   
   URL <- paste("https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@",
                date,
@@ -37,9 +37,8 @@ currency_value <- function(date, currency){
 ```
 
 ```{r}
-currency_value("2024-06-05", "zmk")
+just_values("2024-06-05", "zmk")
 ```
-
 ```{r}
 just_names <- function(date){
   
@@ -64,7 +63,7 @@ just_names <- function(date){
   name_parse$name <- gsub("^X", "", name_parse$name)
 
   name_parse$name[1:2] <- gsub("^.", "$", name_parse$name[1:2])
-
+  
   return(name_parse)
 }
 ```
@@ -74,7 +73,7 @@ just_names("2024-06-05")
 ```
 
 ```{r}
-currency_wrapper1 <- function(date, full_currency_name){
+get_isocode <- function(date, full_currency_name){
   
   directory <- just_names(date)
   
@@ -94,17 +93,17 @@ currency_wrapper1 <- function(date, full_currency_name){
 
 
 ```{r}
-currency_wrapper1("2024-03-02", "US Dollar")
+get_isocode("2024-03-02", "Aergo")
 ```
 
 ```{r}
-currency_wrapper2 <- function(date, full_currency_name){  
+combine_names_currency <- function(date, full_currency_name){  
   
-    cur_code <- currency_wrapper1 (date, full_currency_name)
+    cur_code <- get_isocode(date, full_currency_name)
   
     cur_names <- just_names(date)
   
-    cur_value <- currency_value(date, cur_code)
+    cur_value <- just_values(date, cur_code)
   
     matchlist = c("usd","eur", "btc", "eth", cur_code)
   
@@ -115,34 +114,60 @@ currency_wrapper2 <- function(date, full_currency_name){
       arrange(!name %in% matchlist) 
   
     return(full_conversion)
- 
 }
 ```
 
 ```{r}
-currency_wrapper2("2024-06-05", "Aergo")
+combine_names_currency("2024-06-05", "Aergo")
 ```
 
 ```{r}
-currency_wrapper3 <- function(date, full_currency_name){
+add_country_type <- function(date, full_currency_name){
   
-  country <- country_money |>
-    mutate(isocode = tolower(isocode))
+  names(country_names)[names(country_names) == 'name'] <- 'country_name'
   
-  convert_money <- currency_wrapper2(date, full_currency_name)
+  country <- full_join(country_money, country_names)
+
+  names(country)[names(country) == 'isocode'] <- 'name'
+  
+  country <- country |>
+    mutate(name = tolower(name))|>
+    select(name, country_name) 
+  
+  
+  convert_money <- combine_names_currency(date, full_currency_name)
   
   convert_money$type <- NA
+
+  country_convert <- left_join(convert_money, country)
+
+  country_convert <- country_convert |>
+    mutate(country_name = if_else(currency_name == "Zimbabwean Dollar", "Zimbabwe", country_name)) |>
+    mutate(type = if_else(is.na(country_name), "crypto", "physical"))
   
-  convert_money <- convert_money |>
-    mutate(type = if_else(convert_money$name %in% country$isocode, "physical", "crypto"))
-  
-  return(convert_money)
+  return(country_convert)
   
 }
 ```
 
 ```{r}
-currency_wrapper3("2024-06-05", "Aergo")
+add_country_type("2024-06-05", "Aergo")
+```
+
+```{r}
+type_only <- function(date, full_currency_name){
+  with_dups <- add_country_type(date, full_currency_name)
+  
+  without_dups <- with_dups |>
+    select(!country_name) |>
+    distinct(name, .keep_all = TRUE)
+  
+  without_dups
+}
+```
+
+```{r}
+type_only("2024-06-05", "Aergo")
 ```
 
 ```{r}
@@ -157,7 +182,7 @@ currency_trend_day <- function(date, full_currency_name){
     }  
   
   else {
-    currency_trend <- currency_wrapper3(minus_7, full_currency_name)
+    currency_trend <- type_only(minus_7, full_currency_name)
     
     currency_subset <- head(currency_trend, 5)
     
@@ -182,7 +207,7 @@ currency_trend_month <- function(date, full_currency_name){
   }  
   
   else {
-    currency_trend <- currency_wrapper3(minus_30, full_currency_name)
+    currency_trend <- type_only(minus_30, full_currency_name)
         
     currency_subset <- head(currency_trend, 5)
     
@@ -195,11 +220,32 @@ currency_trend_month <- function(date, full_currency_name){
 currency_trend_month("2024-06-05", "Aergo")
 ```
 
+
+```{r}
+final_function <- function(date, full_currency_name){
+  
+  final_values <- add_country_type(date, full_currency_name)
+  seven_day_trend <- currency_trend_day(date, full_currency_name)
+  month_trend <- currency_trend_month(date, full_currency_name)
+  
+  values <- list(final_values, seven_day_trend, month_trend)
+  
+  return(values)
+}
+```
+
+```{r}
+final_function("2024-06-05", "Aergo")
+```
+
+
 create categories: is country currency or crypto
 create four plots: map with overlay; bar plot with euro, usd & common crypto values; highest value; 7 day trend, 1 month trend
 
 1 month trend and 7 day trend done
 currency type done
+country value done
+
 
 
 

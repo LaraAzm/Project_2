@@ -1,0 +1,85 @@
+```{r}
+just_names_trial <- function(date, full_currency_name){
+  
+  currency_name_function <- function(date){
+    currency_api_URL <- paste("https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@",
+               date,
+               "/v1/currencies.json",
+               sep = "")
+  
+    name_parse <- GET(currency_api_URL)$content |>
+      rawToChar() |>
+      fromJSON() |>
+      as.data.frame() |>
+      as_tibble()|> 
+      mutate(obs.number = row_number()) |>
+      pivot_longer(-obs.number,
+                   values_to = "Currency")
+  
+    name_parse[name_parse == ""] = NA
+  
+    names(name_parse)[names(name_parse) == 'Currency'] <- 'currency_name'
+  
+    name_parse$name <- gsub("^X", "", name_parse$name)
+
+    name_parse$name[1:2] <- gsub("^.", "$", name_parse$name[1:2])
+  
+    return(name_parse)
+  }
+  
+  names <- currency_name_function(date)
+  
+  return_currency_code <- function(full_currency_name){
+    directory <- currency_name_function(date)
+    
+    if(!(full_currency_name %in% directory$currency_name)){
+      stop("Currency not found, please check currency name") 
+      }  
+    
+    else if(full_currency_name %in% directory$currency_name){
+      match <- full_currency_name
+      currency_code <- as.character(directory[which(directory$currency_name == match), "name"])
+      
+      return(currency_code)
+    }
+  }
+  
+  isocode <- return_currency_code(full_currency_name)
+  
+  currency_value_function <- function(date, isocode){
+    URL <- paste("https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@",
+                 date,
+                 "/v1/currencies/",
+                 isocode,
+                 ".json",
+                 sep = "")
+  
+    value_parse <- GET(URL)$content |>
+      rawToChar() |>
+      fromJSON() |>
+      as_tibble()
+  
+    value_parse <- bind_rows(value_parse[[2]], .id = "currency") |>
+      pivot_longer(cols = everything())
+
+    return(value_parse)
+  }
+  
+  values <- currency_value_function(date, isocode)
+  
+  matchlist = c("usd","eur", "btc", "eth", isocode)
+  
+  full_conversion <- full_join(names, values)
+  
+  full_conversion <- full_conversion |>
+    select(name, currency_name, value)|>
+    arrange(!name %in% matchlist) 
+  
+  return(full_conversion)
+}
+```
+
+```{r}
+just_names_trial("2024-06-01", "US Dollar")
+```
+

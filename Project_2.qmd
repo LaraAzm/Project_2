@@ -122,7 +122,7 @@ combine_names_currency("2024-06-05", "Aergo")
 ```
 
 ```{r}
-add_country_type <- function(date, full_currency_name){
+add_country_type <- function(date, full_currency_name, country_name){
   
   names(country_names)[names(country_names) == 'name'] <- 'country_name'
   
@@ -184,9 +184,7 @@ currency_trend_day <- function(date, full_currency_name){
   else {
     currency_trend <- type_only(minus_7, full_currency_name)
     
-    currency_subset <- head(currency_trend, 5)
-    
-    return(currency_subset)
+    return(currency_trend)
   }
 }
 ```
@@ -209,9 +207,7 @@ currency_trend_month <- function(date, full_currency_name){
   else {
     currency_trend <- type_only(minus_30, full_currency_name)
         
-    currency_subset <- head(currency_trend, 5)
-    
-    return(currency_subset)
+    return(currency_trend)
   }
 }
 ```

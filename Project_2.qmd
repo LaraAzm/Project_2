@@ -6,6 +6,7 @@ editor: visual
 ---
 
 ```{r Library read in}
+#reading in the required libraries, collected from different code chunks
 library(httr)
 library(jsonlite)
 library(tidyverse)
@@ -15,8 +16,10 @@ library(r2country)
 ```
 
 ```{r}
+#pulling the values from the chosen api
 just_values <- function(date, currency){
   
+  #building the url
   URL <- paste("https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@",
                date,
                "/v1/currencies/",
@@ -24,163 +27,213 @@ just_values <- function(date, currency){
                ".json",
                sep = "")
   
+  #parsing the data
   value_parse <- GET(URL)$content |>
     rawToChar() |>
     fromJSON() |>
     as_tibble()
   
+
+  #the returned data looked odd so pivoting it longer for later use
   value_parse <- bind_rows(value_parse[[2]], .id = "currency") |>
     pivot_longer(cols = everything())
+  
+  #changing `name` to isocode for later use
+  names(value_parse)[names(value_parse) == 'name'] <- 'isocode'
 
   return(value_parse)
 }
 ```
 
 ```{r}
+#testing the function
 just_values("2024-06-05", "zmk")
 ```
 ```{r}
+#gathering just the names of the currencies as they are stored in a different part of the api
 just_names <- function(date){
   
+  #building the url 
   currency_api_URL <- paste("https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@",
                date,
                "/v1/currencies.json",
                sep = "")
   
+  #parsing the data
   name_parse <- GET(currency_api_URL)$content |>
     rawToChar() |>
     fromJSON() |>
     as.data.frame() |>
-    as_tibble()|> 
+    as_tibble() |> 
+    #the names of currencies are stored as column names, adding observation number to use later on 
     mutate(obs.number = row_number()) |>
+    #using the observation numbers to pivot the table longer 
     pivot_longer(-obs.number,
-               values_to = "Currency")
+               values_to = "currency_name")
   
+  #entering NA values for blank names 
   name_parse[name_parse == ""] = NA
   
-  names(name_parse)[names(name_parse) == 'Currency'] <- 'currency_name'
-  
+  #cleaning up the names
   name_parse$name <- gsub("^X", "", name_parse$name)
 
+  #the `$` sign is part of specific crypto currencies so adding that in
   name_parse$name[1:2] <- gsub("^.", "$", name_parse$name[1:2])
+  
+  #changing `name` to isocode for later use
+  names(name_parse)[names(name_parse) == 'name'] <- 'isocode'
   
   return(name_parse)
 }
 ```
 
 ```{r}
+#testing the function
 just_names("2024-06-05")
 ```
 
 ```{r}
+#wanted to enter just the currency's name instead of knowing the isocode off the top of my head thus adding a helper function to spit out the isocode given the currency name
 get_isocode <- function(date, full_currency_name){
   
+  #pulling in the names function
   directory <- just_names(date)
   
+  #adding condition that when the name is not present in the currency directory, an error code is displayed 
   if(!(full_currency_name %in% directory$currency_name)){
     stop("Currency not found, please check currency name") 
   }  
   
   else if(full_currency_name %in% directory$currency_name){
     
+    #otherwise, matching the currency name to the isocode and returning the isocode 
     match <- full_currency_name
-    currency_code <- as.character(directory[which(directory$currency_name == match), "name"])
+    isocode <- as.character(directory[which(directory$currency_name == match), "isocode"])
     
-    return(currency_code)
+    return(isocode)
   }
 }
 ```
 
 
 ```{r}
+#testing the function
 get_isocode("2024-03-02", "Aergo")
 ```
 
 ```{r}
+#creating a combine function to show all information 
 combine_names_currency <- function(date, full_currency_name){  
   
+    #pulling in the helper function 
     cur_code <- get_isocode(date, full_currency_name)
   
+    #pulling in the names function 
     cur_names <- just_names(date)
   
+    #pulling in the value function but using the currency's name instead of the isocode
     cur_value <- just_values(date, cur_code)
   
+    #creating a list that would display common functions at the top of the returned tibble 
     matchlist = c("usd","eur", "btc", "eth", cur_code)
   
+    #joining all of the tibbles 
     full_conversion <- full_join(cur_names, cur_value)
   
     full_conversion <- full_conversion |>
-      select(name, currency_name, value)|>
-      arrange(!name %in% matchlist) 
+      #showing only the name, currency names and the value
+      select(isocode, currency_name, value)|>
+      #moving the common currencies to the top 
+      arrange(!isocode %in% matchlist) 
   
     return(full_conversion)
 }
 ```
 
 ```{r}
+#testing the function
 combine_names_currency("2024-06-05", "Aergo")
 ```
 
 ```{r}
+#adding names of countries the currencies originate from and the type of currency it is
 add_country_type <- function(date, full_currency_name, country_name){
   
+  #using data built into `r2country` and chnaging the `names` column to prevent future issues  
   names(country_names)[names(country_names) == 'name'] <- 'country_name'
   
+  #combining two `r2country` tibbles
   country <- full_join(country_money, country_names)
-
-  names(country)[names(country) == 'isocode'] <- 'name'
   
+  #lowering the case of isocodes
   country <- country |>
-    mutate(name = tolower(name))|>
-    select(name, country_name) 
+    mutate(isocode = tolower(isocode))|>
+    select(isocode, country_name) 
   
-  
+  #pulling in the combined tibble
   convert_money <- combine_names_currency(date, full_currency_name)
   
+  #adding an additional column 
   convert_money$type <- NA
 
+  #combining the country and combined tibble from api
   country_convert <- left_join(convert_money, country)
 
+  #adding a type function
   country_convert <- country_convert |>
+    #changing some misshandled data 
     mutate(country_name = if_else(currency_name == "Zimbabwean Dollar", "Zimbabwe", country_name)) |>
+    #adding currency type based on if it originated from a country or not
     mutate(type = if_else(is.na(country_name), "crypto", "physical"))
   
   return(country_convert)
-  
 }
 ```
 
 ```{r}
+#testing the function
 add_country_type("2024-06-05", "Aergo")
 ```
 
 ```{r}
+#creating a function that returns the tibbles with type information but not the country information
 type_only <- function(date, full_currency_name){
+  
+  #pulling in the country and type function
   with_dups <- add_country_type(date, full_currency_name)
   
+  #removing some duplicated values
   without_dups <- with_dups |>
+    #dropping the country column 
     select(!country_name) |>
-    distinct(name, .keep_all = TRUE)
+    #removing the dup values caused by multiple countries using the same currency
+    distinct(isocode, .keep_all = TRUE)
   
-  without_dups
+  return(without_dups)
 }
 ```
 
 ```{r}
+#testing the function
 type_only("2024-06-05", "Aergo")
 ```
 
 ```{r}
+#creating a function that outputs the values of a currency from seven days ago 
 currency_trend_day <- function(date, full_currency_name){
   
+  #changing the character value to a date one
   date_value  <- as.Date(date)
   
-  minus_7 <- date_value
-
-  if(!(minus_7 > as.Date("2024-03-02"))){
-  stop("Date out of range for api") 
-    }  
+  #subtarcting 7 days from the date given 
+  minus_7 <- date_value - 7
   
+  #adding an error code if the date given travels outside of api range 
+  if(!(minus_7 > as.Date("2024-03-02"))){
+  stop("Date out of range for api")
+  }
+  
+  #otherwise returniing the requested data
   else {
     currency_trend <- type_only(minus_7, full_currency_name)
     
@@ -190,10 +243,12 @@ currency_trend_day <- function(date, full_currency_name){
 ```
 
 ```{r}
-currency_trend_day("2024-06-05", "Tenset")
+#testing the function
+currency_trend_day("2024-06-05", "Aergo")
 ```
 
 ```{r}
+#repeating with a 30 day trend
 currency_trend_month <- function(date, full_currency_name){
   
   date_value  <- as.Date(date)
@@ -213,17 +268,20 @@ currency_trend_month <- function(date, full_currency_name){
 ```
 
 ```{r}
+#testing the function
 currency_trend_month("2024-06-05", "Aergo")
 ```
 
 
 ```{r}
+#creating a final function to return everything previously run
 final_function <- function(date, full_currency_name){
   
   final_values <- add_country_type(date, full_currency_name)
   seven_day_trend <- currency_trend_day(date, full_currency_name)
   month_trend <- currency_trend_month(date, full_currency_name)
   
+  #combining the returns into a single list
   values <- list(final_values, seven_day_trend, month_trend)
   
   return(values)
@@ -231,6 +289,7 @@ final_function <- function(date, full_currency_name){
 ```
 
 ```{r}
+#testing the function
 final_function("2024-06-05", "Aergo")
 ```
 
